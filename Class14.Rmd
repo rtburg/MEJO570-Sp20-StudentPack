@@ -1,0 +1,182 @@
+---
+title: "Working with Strings"
+author: "FIRSTNAME LASTNAME"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+time: "`r format(Sys.time(), '%H:%M')`"
+output: html_document
+---
+
+
+
+## Instructions
+Today in class we will begin dealing with messy text data -- names, professions and employers in the campaign finance data.
+
+We will use ...
+
+* str_detect()
+* str_replace()
+* str_sub()
+* str_to_upper and str_to_lower and str_to_title
+* str_trim()
+
+
+We will not use today ... 
+
+* str_extract()
+* str_split()
+* str_c()
+* str_count()
+
+
+### Load the tidyverse package(s)
+Also, explicitly load stringr package.
+```{r}
+#install.packages("tidyverse")
+library(tidyverse)
+library(stringr)
+
+```
+
+
+### Load the data 
+Do this from HW 10
+
+```{r}
+
+url <- "https://cf.ncsbe.gov/CFOrgLkup/ExportDetailResults/?ReportID=168216&Type=REC&Title=Cooper%20for%20North%20Carolina%20-%202019%20Mid%20Year%20Semi-Annual"
+
+#read_csv() does not do a great job here guessing the correct col_types, so we have to define them explicitly.
+
+cooper_rcpts_2019B <- read_csv(url, 
+    col_types = cols(
+      `Account Abbr` = col_character(), 
+        City = col_character(), 
+      `Country Name` = col_character(), 
+        Date = col_date(format = "%m/%d/%Y"), 
+        Description = col_character(), 
+      `Employers Name` = col_character(), 
+        `Full Zip` = col_character(), 
+      `Outside US Postal Code` = col_character(), 
+        Profession = col_character(), 
+      Purpose = col_character(), 
+        State = col_character(), 
+      `Street 1` = col_character(), 
+        `Street 2` = col_character()),
+    skip = 1)
+
+#Finally, we should rename the columns to remove spaces and generally promote brevity.
+
+names(cooper_rcpts_2019B) <- c("date","prior","donor","street1","street2","city","state","zip","country","postal","profession","employer","purpose","type","account","payment_form","description","amount","sum_to_date")
+
+
+
+candidates2020 <- read_csv("https://s3.amazonaws.com/dl.ncsbe.gov/Elections/2020/Candidate%20Filing/Candidate_Listing_2020.csv", 
+    col_types = cols(candidacy_dt = col_date(format = "%m/%d/%Y"), 
+        election_dt = col_date(format = "%m/%d/%Y")))
+
+
+```
+
+
+### String Detect
+If you wanted to find donors who work for the University of North Carolina at Chapel Hill.
+
+Find all the university employers by using str_detect(). This function returns TRUE when a particular string of characters is found anywhere inside the data.
+```{r}
+cooper_rcpts_2019B %>%
+  filter(str_detect(employer, "UNIVERSITY"))
+```
+
+
+Maybe some are from UNC?
+
+```{r}
+cooper_rcpts_2019B %>%
+  filter(str_detect(employer, "UNC"))
+```
+
+Another way the data might be listed is "University of ..." Here we use a "wildcard" character -- "." -- that tells R to look for "any character except a new line".
+
+This wildcard character is the most simple implementation of something called "regular expressions". Regular expressions are used in almost all computer languages to match patterns in character strings. You can read more at https://stringr.tidyverse.org/articles/regular-expressions.html
+
+```{r}
+cooper_rcpts_2019B %>%
+  filter(str_detect(employer, "U. OF"))
+```
+
+Well, that did give us some hits, but not the hits we need. So we can discard it.
+
+Now, let's find all employers that are either "UNC" OR "UNIVERSITY"
+
+```{r}
+cooper_rcpts_2019B %>%
+  filter(str_detect(employer, "UNC") | str_detect(employer, "UNIVERSITY"))
+```
+
+Well shoot... We have people from "BUNCOMBE COUNTY SCHOOLS". Why? Because "UNC" is inside "BUNCOMBE". 
+
+We have other false positives as well. We need to use another special character to tell R to look only at the start of the string. We do this with a "^" character. (It's above the 6 on your keyboard.)
+
+
+```{r}
+cooper_rcpts_2019B %>%
+  filter(str_detect(employer, "^UNC") | str_detect(employer, "UNIVERSITY"))
+```
+
+Well, we got rid of about 30 of those buggers. It's a start at least. Other than going through 469 rows, how can we check to see if we're getting close?
+
+Let's see how many unique values we have and count how many are in each group.
+
+```{r}
+cooper_rcpts_2019B %>%
+  filter(str_detect(employer, "^UNC") | str_detect(employer, "UNIVERSITY")) %>%
+  group_by(employer) %>%
+  summarize(donations=n()) %>%
+  arrange(desc(donations))
+```
+
+92 isn't awesome, but it's much fewer than 400+.
+
+Now we have some editorial decisions to make. Do we want "DUKE UNIVERSITY HEALTH SYSTEMS" and "OXFORD UNIVERSITY PRESS" and others we see?
+
+
+In any case, let's start consolidating some of these employers by using our second new function, str_replace().
+
+Until we know we've got it right, we're going to create a new dataframe and a new column to store our replacements.
+
+```{r}
+coop_B_new <- cooper_rcpts_2019B %>%
+  mutate(NewEmp = str_replace(employer, "^UNC", "UNIVERSITY OF NORTH CAROLINA"))
+```
+
+Did we get them?
+
+
+```{r}
+coop_B_new  %>%
+  filter(str_detect(NewEmp, "^UNC") )
+```
+
+Looks like we did.
+
+
+
+
+
+### Split donor names
+I love the idea of splitting columns, but we don't have to do it for anything we are working on this semester. And it is always more of a challenge than you think it will be. 
+
+### Creating separate columns for districts and seats
+Let's say you just wanted to create a table of US HOUSE candidates, and you wanted to pull the district out into a separate column. We can use str_detect to find the columns we want and then str_sub to pull out just certain characters.
+
+
+```{r}
+  candidates2020_update <- candidates2020 %>%
+  filter( str_detect(contest_name, "US HOUSE OF REPRESENTATIVES DISTRICT")) %>%
+  mutate(Office="US HOUSE OF REPRESENTATIVES", District = str_sub(contest_name, -2, -1))
+```
+
+
+
+
+

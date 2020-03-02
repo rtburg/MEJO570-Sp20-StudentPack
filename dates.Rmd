@@ -1,0 +1,211 @@
+---
+title: "Working with Dates Using Lubridate"
+output: html_document
+---
+
+Dates are a special kind of data. Often, when you are loading columns that contain dates and times into R, they will by default be created as character data types. The best way to deal with this is to force them into date date types when you load them. For example, if you go back and see the code we used to create the dataframes we will be using during the rest of the semester, you will see that we did this:
+
+
+    col_types = cols(candidacy_dt = col_date(format = "%m/%d/%Y"), 
+        election_dt = col_date(format = "%m/%d/%Y")))
+
+
+But there is one dataset where we didn't fix the dates -- voters_yancey. Let's do that now by using one of lubridate's parsing functions. But first, let's create and then parse one variable to see how it works. We will use the first value in the registr_dt column in the voters_yancey dataframe as an example.
+
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+
+```{r}
+
+sample_regisr_date <- "05/05/2016"
+
+sample_regisr_date
+
+```
+
+You can see that it is a character type in the Global Environment pane.
+
+Now, let's parse that character string into a special date data type using the mdy() function from lubridate.
+
+
+```{r}
+sample_registr_date <- mdy(sample_registr_date)
+
+sample_registr_date
+```
+
+You'll see in the Global Environment that that variable is now a "Date" type and not a character type.
+
+(If you run this again later and get an error that says "All formats failed to parse" that is because since the variable was alreayd a date type R was not able to parse a date into a date. It's a "no harm, no foul" error message that can cause momentary panic.)
+
+This particular parsing function -- mdy() -- works in this particular case because the character was in the month-day-year format. Actually you could re-parse it with the dmy() function ... it will run, but you will get some illogical results. Perhaps more on this later.
+
+In any case, there are seven parsing functions that you can use from lubridate to parse dates. And the great thing is that it will parse all sorts of dates. Check this out... 
+
+```{r}
+hinton_james <- c("February 12, 1795", "2-12-1795", "02-12-1795")
+```
+
+And then... 
+
+```{r}
+fixed_hinton_james <- mdy(hinton_james)
+
+fixed_hinton_james
+```
+
+Oh, and you'll notice that the way a parsed date appears will *ALWAYS* by year-month-day regardless of what function you use to transform it.
+
+Now let's fix the real registration date column in voters_yancey... 
+
+```{r}
+voters_yancey$registr_dt <- mdy(voters_yancey$registr_dt)
+```
+
+And now we should see that the column is a date type... 
+
+```{r}
+str(voters_yancey)
+```
+
+Now that we have it in the date type, we can ask the data all sorts of date-related questions. A lot of times we don't want to know exactly what date something happened, but what year or month. Lubridate has six functions that help us access parts of the date, and four more (which we won't use now) that allow us to access parts of a time.
+
+For example, let's say we wanted to know what year everyone registered...
+```{r}
+year(voters_yancey$registr_dt)
+```
+
+With that, let's combine our new trick with our old to find out how many people registered in each year.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+voters_yancey %>% 
+  group_by(year=year(registr_dt)) %>%
+  summarize(VotersWhoRegistered = n())
+```
+
+
+Cool. It would appear Yancey county has someone 119 years old who is registered to vote. That is either the second oldest person who ever lived (https://en.wikipedia.org/wiki/List_of_the_verified_oldest_people) or bad data we will have to ask about later.
+
+But wouldn't this be easier to see in a chart? What don't we add that toll we have.
+
+```{r}
+library(ggplot2)
+
+voters_yancey %>% 
+  group_by(year=year(registr_dt)) %>%
+  summarize(VotersWhoRegistered = n()) %>%
+  ggplot(aes(x=year, y=VotersWhoRegistered)) + 
+  geom_col() +
+  scale_x_continuous(breaks = seq(1900, 2020, by = 4)) +
+  theme(axis.text.x = element_text(angle=90))
+```
+
+
+
+What if we wanted to see which party registered voters in the different months of 2016?
+
+
+
+
+
+
+
+
+```{r}
+voters_yancey %>% 
+  filter(year(registr_dt) == 2016) %>%
+  group_by(month=month(registr_dt, label = TRUE), party_cd) %>%
+  summarize(VotersWhoRegistered = n()) %>%
+  pivot_wider(values_from = VotersWhoRegistered, names_from = month) 
+
+```
+
+
+
+
+You can even do weekday ...
+```{r}
+wday(voters_yancey$registr_dt, label = TRUE, abbr = FALSE)
+```
+
+
+We can also do math with dates...
+
+```{r}
+election_dt_2016 <- as.Date("2016-11-08")
+
+voters_yancey %>%
+  filter(year(registr_dt) == 2016) %>%
+  transmute(days_before_election = election_dt_2016 - registr_dt)
+#when you do it this way, R gives it to you in days.
+
+
+```
+
+```{r}
+voters_yancey %>%
+  filter(year(registr_dt) == 2016) %>%
+  transmute(days_before_election = difftime(election_dt_2016,registr_dt))
+```
+
+
+What will each of these do?
+
+```{r}
+
+#today() - hinton_james
+
+
+today() - mdy(hinton_james)
+```
+
+```{r}
+difftime(today(), mdy(hinton_james))
+```
+
+
+```{r}
+as.duration(difftime(today(), mdy(hinton_james)))
+```
+
+
+
+Here's a weird thing... in R, a duration is the exact number of seconds in a day, month, year, etc.
+
+```{r}
+as.duration(difftime(today(), mdy(hinton_james))) / dyears(1)
+```
+
+
+... but periods in R take into account things like daylight savings time and leap years
+
+```{r}
+as.period(difftime(today(), mdy(hinton_james))) / years(1)
+```
+
+```{r}
+as.period(difftime(today(), mdy(hinton_james))) / days(1)
+```
+
+
+There are similar functions that allow you to parse hours, minutes and second and do calculations with them, but we will not be using them this semester.
+
+

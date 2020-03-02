@@ -1,0 +1,74 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(tidyverse)
+
+
+arrange(MLBpayrolls, TEAM, desc(Payroll.2016))
+
+
+```
+
+
+
+The first thing I wanted to do was find the quartiles... 
+```{r}
+#The first thing I wanted to do was find the quartiles... 
+
+summary(MLBpayrolls)
+```
+
+Ah. I see the 1st Quartile is 57097310, so I will use that in my filter now... 
+
+```{r}
+
+
+
+
+
+MLBpayrolls %>% 
+  filter(Payroll.2016< 89436812 | Payroll.2016>144913712) %>%
+  select(TEAM, Payroll.2004) %>%
+  arrange(Payroll.2004)
+  
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
